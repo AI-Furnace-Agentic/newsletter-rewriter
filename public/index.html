@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>AI Furnace — Story Rewriter</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --panel: #ffffff;
+    --ink: #1a1a18;
+    --muted: #6b6b66;
+    --line: #e3e1dc;
+    --accent: #b4552d;
+    --accent-soft: #fdf1ea;
+    --ok: #2f6f4f;
+    --err: #a3341f;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #1e1e23;
+      --ink: #eceae6;
+      --muted: #9b9a95;
+      --line: #33333a;
+      --accent: #e08154;
+      --accent-soft: #2a201b;
+      --ok: #6fbf95;
+      --err: #e88b76;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem 5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  header { margin-bottom: 1.75rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0; font-size: .95rem; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+  label { display: block; font-size: .78rem; font-weight: 600; letter-spacing: .04em;
+          text-transform: uppercase; color: var(--muted); margin-bottom: .3rem; }
+  input[type=text], input[type=password], input[type=url], textarea {
+    width: 100%; padding: .6rem .7rem; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 7px; resize: vertical;
+  }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  textarea { min-height: 8.5rem; line-height: 1.55; }
+  .field + .field { margin-top: .8rem; }
+
+  .story-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .8rem; }
+  .story-num { font-weight: 700; font-size: 1rem; }
+  .optional { font-size: .8rem; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 1.5rem 0; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 7px;
+    border: 1px solid transparent; padding: .65rem 1.3rem;
+    background: var(--accent); color: #fff;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.07); }
+  button:disabled { opacity: .55; cursor: default; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); padding: .35rem .75rem; font-size: .85rem; font-weight: 500; }
+
+  .status { font-size: .92rem; color: var(--muted); }
+  .status.error { color: var(--err); }
+  .banner { padding: .7rem .9rem; border-radius: 7px; font-size: .92rem; margin-bottom: 1rem; display: none; }
+  .banner.error { display: block; background: var(--accent-soft); color: var(--err); border: 1px solid var(--err); }
+
+  #results:empty { display: none; }
+  .results-head { display: flex; align-items: center; justify-content: space-between;
+                  gap: 1rem; margin: 2.5rem 0 1rem; padding-top: 1.5rem; border-top: 2px solid var(--line); }
+  .results-head h2 { font-size: 1.25rem; margin: 0; }
+  /* display:flex above would otherwise beat the UA rule for [hidden]. */
+  .results-head[hidden] { display: none; }
+
+  .result { background: var(--panel); border: 1px solid var(--line);
+            border-left: 3px solid var(--accent); border-radius: var(--radius);
+            padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+  .result .cat { font-size: .74rem; font-weight: 700; letter-spacing: .07em;
+                 text-transform: uppercase; color: var(--accent); }
+  .result h3 { font-size: 1.18rem; margin: .35rem 0 .8rem; line-height: 1.35; }
+  .result p { margin: 0 0 .85rem; }
+  .result .src { font-size: .85rem; word-break: break-all; }
+  .result a { color: var(--accent); }
+  .result footer { display: flex; align-items: center; gap: .6rem;
+                   margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  .was { font-size: .8rem; color: var(--muted); font-style: italic; }
+  .copied { color: var(--ok); font-size: .85rem; font-weight: 600; }
+
+  .spinner { width: 15px; height: 15px; border: 2px solid var(--line);
+             border-top-color: var(--accent); border-radius: 50%;
+             display: inline-block; vertical-align: -2px; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>AI Furnace — Story Rewriter</h1>
+    <p class="sub">Paste your five picked stories. Each comes back as a rewritten headline plus two paragraphs, ready to paste into beehiiv.</p>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="passphrase">Passphrase</label>
+      <input type="password" id="passphrase" autocomplete="current-password"
+             placeholder="Typed once — this browser remembers it" />
+    </div>
+  </div>
+
+  <form id="form"></form>
+
+  <div class="actions">
+    <button type="button" id="run">Rewrite all stories</button>
+    <button type="button" class="ghost" id="clear">Clear all</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="results-head" id="results-head" hidden>
+    <h2>Rewritten</h2>
+    <button type="button" class="ghost" id="copy-all">Copy all</button>
+  </div>
+  <div id="results"></div>
+
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
