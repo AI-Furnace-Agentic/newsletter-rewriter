@@ -1,5 +1,5 @@
 const STORY_COUNT = 5;
-const DRAFT_KEY = "aifurnace.draft.v1";
+const DRAFT_KEY = "aifurnace.draft.v2";
 const PASS_KEY = "aifurnace.passphrase.v1";
 
 const $ = (id) => document.getElementById(id);
@@ -12,7 +12,7 @@ const passInput = $("passphrase");
 
 let lastResults = [];
 
-// ---------- build the input form ----------
+// ---------- build the input form: one box per story ----------
 
 for (let i = 1; i <= STORY_COUNT; i++) {
   const panel = document.createElement("div");
@@ -23,35 +23,20 @@ for (let i = 1; i <= STORY_COUNT; i++) {
       <span class="optional">Leave blank to skip</span>
     </div>
     <div class="field">
-      <label for="h${i}">Headline</label>
-      <input type="text" id="h${i}" data-role="headline" data-n="${i}"
-             placeholder="The headline as it appeared in the newsletter" />
-    </div>
-    <div class="field">
-      <label for="c${i}">Content</label>
-      <textarea id="c${i}" data-role="content" data-n="${i}"
-                placeholder="Paste the story text — summary, key points, details, why it matters"></textarea>
-    </div>
-    <div class="field">
-      <label for="u${i}">Source URL <span class="optional">optional</span></label>
-      <input type="url" id="u${i}" data-role="url" data-n="${i}"
-             placeholder="https://..." />
+      <textarea id="s${i}" data-role="text" data-n="${i}"
+                placeholder="Paste the whole story here — headline and summarized content together"></textarea>
     </div>`;
   form.appendChild(panel);
 }
 
 // ---------- persistence ----------
 
-const fields = () => Array.from(form.querySelectorAll("[data-role]"));
+const fields = () => Array.from(form.querySelectorAll("[data-role='text']"));
 
 function readStories() {
-  const out = Array.from({ length: STORY_COUNT }, () => ({
-    headline: "",
-    content: "",
-    url: "",
-  }));
+  const out = Array.from({ length: STORY_COUNT }, () => ({ text: "" }));
   for (const el of fields()) {
-    out[Number(el.dataset.n) - 1][el.dataset.role] = el.value;
+    out[Number(el.dataset.n) - 1].text = el.value;
   }
   return out;
 }
@@ -72,12 +57,8 @@ function restore() {
     const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
     if (!Array.isArray(draft)) return;
     draft.forEach((s, idx) => {
-      const n = idx + 1;
-      if (!s) return;
-      for (const role of ["headline", "content", "url"]) {
-        const el = form.querySelector(`[data-role="${role}"][data-n="${n}"]`);
-        if (el && s[role]) el.value = s[role];
-      }
+      const el = form.querySelector(`[data-role="text"][data-n="${idx + 1}"]`);
+      if (el && s?.text) el.value = s.text;
     });
   } catch {
     /* ignore corrupt storage */
@@ -104,16 +85,9 @@ const escapeHtml = (s) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 
+// One unified block: headline, blank line, the two paragraphs.
 function plainText(story) {
-  return [
-    story.category,
-    story.headline,
-    "",
-    story.paragraph1,
-    "",
-    story.paragraph2,
-    story.url ? `\nSource: ${story.url}` : "",
-  ]
+  return [story.headline, "", story.paragraph1, "", story.paragraph2]
     .join("\n")
     .trim();
 }
@@ -147,28 +121,15 @@ async function copy(text, btn) {
 
 function render(stories) {
   resultsEl.innerHTML = "";
-  stories.forEach((s, i) => {
+  stories.forEach((s) => {
     const card = document.createElement("article");
     card.className = "result";
     card.innerHTML = `
-      <div class="cat">${escapeHtml(s.category || "")}${
-        s.company ? " · " + escapeHtml(s.company) : ""
-      }</div>
-      <h3>${i + 1}) ${escapeHtml(s.headline || "")}</h3>
+      <h3>${escapeHtml(s.headline || "")}</h3>
       <p>${escapeHtml(s.paragraph1 || "")}</p>
       <p>${escapeHtml(s.paragraph2 || "")}</p>
-      ${
-        s.url
-          ? `<p class="src"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.url)}</a></p>`
-          : ""
-      }
       <footer>
         <button type="button" class="ghost">Copy this story</button>
-        ${
-          s.originalHeadline
-            ? `<span class="was">was: ${escapeHtml(s.originalHeadline)}</span>`
-            : ""
-        }
       </footer>`;
     card.querySelector("footer button").addEventListener("click", (e) => {
       copy(plainText(s), e.currentTarget);
@@ -177,6 +138,9 @@ function render(stories) {
   });
   resultsHead.hidden = stories.length === 0;
 }
+
+// Exposed for manual testing in the console.
+window.render = render;
 
 // ---------- run ----------
 
@@ -201,7 +165,7 @@ async function run() {
   }
 
   const stories = readStories();
-  if (!stories.some((s) => s.headline.trim() || s.content.trim())) {
+  if (!stories.some((s) => s.text.trim())) {
     showError("Paste at least one story before rewriting.");
     return;
   }
