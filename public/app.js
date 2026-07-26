@@ -194,9 +194,16 @@ async function run() {
 
     lastResults = data.stories || [];
     render(lastResults);
+
+    // Successful rewrite: clear the input boxes and the saved draft so the
+    // next visit starts blank. The results below stay until the page closes,
+    // and the passphrase is kept.
+    for (const el of fields()) el.value = "";
+    saveDraft();
+
     statusEl.textContent = `Done — ${lastResults.length} ${
       lastResults.length === 1 ? "story" : "stories"
-    } rewritten.`;
+    } rewritten. Input boxes cleared for next time.`;
     resultsHead.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     statusEl.className = "status error";
