@@ -1,0 +1,11 @@
+{
+  // Must match the existing Cloudflare project name so deploys update it
+  // rather than creating a second Worker.
+  "name": "newsletter-rewriter",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-26",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  }
+}
