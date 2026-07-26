@@ -25,20 +25,11 @@ const OUTPUT_SCHEMA = {
             description:
               "The 1-based number of the input story this rewrite came from.",
           },
-          category: { type: "string" },
-          company: { type: "string" },
           headline: { type: "string" },
           paragraph1: { type: "string" },
           paragraph2: { type: "string" },
         },
-        required: [
-          "index",
-          "category",
-          "company",
-          "headline",
-          "paragraph1",
-          "paragraph2",
-        ],
+        required: ["index", "headline", "paragraph1", "paragraph2"],
         additionalProperties: false,
       },
     },
@@ -67,20 +58,15 @@ function passphraseMatches(supplied, expected) {
 function buildPrompt(stories) {
   return [
     `Rewrite the ${stories.length} ${stories.length === 1 ? "story" : "stories"} below as one coherent AI Furnace edition.`,
-    `Order them per the narrative-flow rule and return every story exactly once,`,
-    `each tagged with the "index" number it was given here.`,
+    `Each story arrives as a single pasted block that contains its original`,
+    `headline somewhere inside it along with the summarized content — identify`,
+    `the headline yourself. Rewrite ONLY from what is pasted; do not add facts`,
+    `from anywhere else.`,
+    `Order the stories per the narrative-flow rule and return every story`,
+    `exactly once, tagged with the "index" number it was given here.`,
     "",
     ...stories.map((s) =>
-      [
-        `--- STORY ${s.number} ---`,
-        `Original headline: ${s.headline}`,
-        s.url ? `Source URL: ${s.url}` : null,
-        "Source content:",
-        s.content,
-        "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      [`--- STORY ${s.number} ---`, s.text, ""].join("\n"),
     ),
   ].join("\n");
 }
@@ -90,7 +76,7 @@ export async function onRequestPost({ request, env }) {
     return json(
       {
         error:
-          "Server is not configured. Set ANTHROPIC_API_KEY and APP_PASSPHRASE in the Cloudflare Pages environment variables, then redeploy.",
+          "Server is not configured. Set ANTHROPIC_API_KEY and APP_PASSPHRASE in the Cloudflare environment variables, then redeploy.",
       },
       500,
     );
@@ -111,26 +97,19 @@ export async function onRequestPost({ request, env }) {
   const stories = submitted
     .map((s, i) => ({
       number: i + 1,
-      headline: String(s?.headline ?? "").trim(),
-      content: String(s?.content ?? "").trim(),
-      url: String(s?.url ?? "").trim(),
+      text: String(s?.text ?? "").trim(),
     }))
-    .filter((s) => s.headline || s.content);
+    .filter((s) => s.text);
 
   if (stories.length === 0) {
-    return json(
-      { error: "Add at least one story — a headline and its content." },
-      400,
-    );
+    return json({ error: "Paste at least one story first." }, 400);
   }
 
-  const incomplete = stories.find((s) => !s.headline || !s.content);
-  if (incomplete) {
+  const tooShort = stories.find((s) => s.text.length < 80);
+  if (tooShort) {
     return json(
       {
-        error: `Story ${incomplete.number} is missing its ${
-          incomplete.headline ? "content" : "headline"
-        }. Fill both in, or clear the box entirely to skip it.`,
+        error: `Story ${tooShort.number} looks too short to rewrite — paste the headline and the summarized content together.`,
       },
       400,
     );
@@ -237,14 +216,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Claude returned malformed output." }, 502);
   }
 
-  // Reattach each source URL to its story via the index the model echoed back.
-  const byNumber = new Map(stories.map((s) => [s.number, s]));
-  const results = (parsed.stories || []).map((s) => ({
-    ...s,
-    url: byNumber.get(s.index)?.url || "",
-    originalHeadline: byNumber.get(s.index)?.headline || "",
-  }));
-
+  const results = parsed.stories || [];
   if (results.length === 0) {
     return json({ error: "Claude returned no stories." }, 502);
   }
