@@ -4,6 +4,9 @@
   "name": "newsletter-rewriter",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-26",
+  // Deploys must not wipe ANTHROPIC_API_KEY / APP_PASSPHRASE set in the
+  // Cloudflare dashboard. Without this, every deploy clears them.
+  "keep_vars": true,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
