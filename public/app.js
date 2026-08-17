@@ -1,4 +1,4 @@
-const STORY_COUNT = 5;
+const STORY_COUNT = 7;
 const DRAFT_KEY = "aifurnace.draft.v2";
 const PASS_KEY = "aifurnace.passphrase.v1";
 
@@ -221,7 +221,7 @@ $("copy-all").addEventListener("click", (e) => {
 });
 
 $("clear").addEventListener("click", () => {
-  if (!confirm("Clear all five stories and the results?")) return;
+  if (!confirm(`Clear all ${STORY_COUNT} stories and the results?`)) return;
   for (const el of fields()) el.value = "";
   saveDraft();
   lastResults = [];

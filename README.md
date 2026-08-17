@@ -1,6 +1,6 @@
 # AI Furnace — Story Rewriter
 
-A one-page tool: paste up to five newsletter stories, click **Rewrite**, and get
+A one-page tool: paste up to seven newsletter stories, click **Rewrite**, and get
 back each story as a rewritten headline plus two paragraphs in AI Furnace
 editorial style, ready to copy into beehiiv.
 
@@ -29,8 +29,12 @@ You need two accounts (both free) and about 20 minutes.
    real safety net — it caps the damage no matter what else happens.
 3. Create an API key and copy it. You won't be able to see it again.
 
-Cost is about **4–6 cents per run** (one edition of five stories), so roughly
-**$0.25/month** at one edition a week. The $5 cap is ~100 runs of headroom.
+Cost is roughly **15–20 cents per run** (one edition of seven stories) — the
+editorial spec is resent on every call, and Opus 5 thinks by default, so most of
+the cost is tokens you don't see. At one edition a week that's about **$1/month**;
+at five runs a week, nearer **$3–4/month**. The $5 cap leaves ample headroom
+either way. Check the console's usage page after a few real runs — these are
+estimates, and thinking volume varies by input.
 
 > This is billed separately from your Claude subscription. The subscription pays
 > for you using the Claude apps; this pays for Cloudflare's server calling Claude
