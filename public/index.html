@@ -102,6 +102,27 @@
   .was { font-size: .8rem; color: var(--muted); font-style: italic; }
   .copied { color: var(--ok); font-size: .85rem; font-weight: 600; }
 
+  /* ---- feedback / preference capture ---- */
+  .feedback { margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed var(--line); }
+  .fb-ask { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .fb-q { font-size: .85rem; color: var(--muted); margin-right: .2rem; }
+  .fb-note { font-size: .85rem; display: flex; align-items: center;
+             gap: .6rem; flex-wrap: wrap; }
+  .fb-note.good { color: var(--ok); font-weight: 600; }
+  .fb-note .ghost { font-weight: 500; }
+  .fb-edit label { margin-bottom: .35rem; }
+  .fb-hint { font-size: .82rem; color: var(--muted); margin: 0 0 .5rem;
+             text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .fb-edit textarea { min-height: 10rem; }
+  .fb-actions { display: flex; align-items: center; gap: .6rem;
+                flex-wrap: wrap; margin-top: .7rem; }
+  .fb-actions button:not(.ghost) { padding: .5rem 1rem; font-size: .9rem; }
+
+  .fb-log { margin-top: 2rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+            display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+            font-size: .88rem; color: var(--muted); }
+  .fb-log[hidden] { display: none; }
+
   .spinner { width: 15px; height: 15px; border: 2px solid var(--line);
              border-top-color: var(--accent); border-radius: 50%;
              display: inline-block; vertical-align: -2px; animation: spin .7s linear infinite; }
@@ -140,6 +161,12 @@
     <button type="button" class="ghost" id="copy-all">Copy all</button>
   </div>
   <div id="results"></div>
+
+  <div class="fb-log" id="fb-log" hidden>
+    <span id="fb-log-count"></span>
+    <button type="button" class="ghost" id="fb-export">Download them</button>
+    <button type="button" class="ghost" id="fb-reset">Clear saved preferences</button>
+  </div>
 
 </div>
 <script src="/app.js"></script>

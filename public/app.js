@@ -1,6 +1,7 @@
 const STORY_COUNT = 7;
 const DRAFT_KEY = "aifurnace.draft.v2";
 const PASS_KEY = "aifurnace.passphrase.v1";
+const FEEDBACK_KEY = "aifurnace.feedback.v1";
 
 const $ = (id) => document.getElementById(id);
 const form = $("form");
@@ -11,6 +12,15 @@ const resultsHead = $("results-head");
 const passInput = $("passphrase");
 
 let lastResults = [];
+// The stories exactly as submitted. Captured at run time because run() clears
+// the input boxes on success, and the learning step needs the original text to
+// tell a style edit apart from a factual correction.
+let lastSubmitted = [];
+// idx (1-based input slot) -> { verdict, final, savedAt }
+const feedback = new Map();
+// Identifies one batch of rewrites, so a story that gets voted on, undone, and
+// voted on again leaves exactly one record instead of a contradictory pair.
+let runId = null;
 
 // ---------- build the input form: one box per story ----------
 
@@ -76,6 +86,95 @@ passInput.addEventListener("input", () => {
 
 restore();
 
+// ---------- saved preferences ----------
+// Phase 1 keeps these in the browser only. Nothing is sent anywhere and the
+// editorial spec is untouched; feeding them back into it is the next step.
+
+function loadPreferences() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FEEDBACK_KEY) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+// One record per (run, story): re-voting replaces the earlier verdict rather
+// than stacking a second, conflicting one on top of it.
+function savePreference(entry) {
+  const all = loadPreferences().filter(
+    (e) => !(e.runId === entry.runId && e.storyIndex === entry.storyIndex),
+  );
+  all.push(entry);
+  try {
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(all));
+  } catch {
+    showError(
+      "Couldn't save — this browser is out of storage or in private mode.",
+    );
+    return false;
+  }
+  refreshLog();
+  return true;
+}
+
+function refreshLog() {
+  const all = loadPreferences();
+  const log = $("fb-log");
+  log.hidden = all.length === 0;
+  if (all.length === 0) return;
+
+  const edits = all.filter((e) => e.verdict === "dislike").length;
+  const likes = all.length - edits;
+  $("fb-log-count").textContent =
+    `${all.length} saved ${all.length === 1 ? "preference" : "preferences"} ` +
+    `(${likes} liked, ${edits} with an edited version).`;
+}
+
+function dropPreference(storyIndex) {
+  const all = loadPreferences();
+  const kept = all.filter(
+    (e) => !(e.runId === runId && e.storyIndex === storyIndex),
+  );
+  if (kept.length === all.length) return;
+  try {
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(kept));
+  } catch {
+    /* ignore */
+  }
+  refreshLog();
+}
+
+$("fb-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(loadPreferences(), null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `aifurnace-preferences-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$("fb-reset").addEventListener("click", () => {
+  const n = loadPreferences().length;
+  if (!n) return;
+  if (!confirm(`Delete all ${n} saved preferences? This cannot be undone.`)) {
+    return;
+  }
+  try {
+    localStorage.removeItem(FEEDBACK_KEY);
+  } catch {
+    /* ignore */
+  }
+  feedback.clear();
+  render(lastResults);
+  refreshLog();
+});
+
+refreshLog();
+
 // ---------- rendering ----------
 
 const escapeHtml = (s) =>
@@ -119,6 +218,110 @@ async function copy(text, btn) {
   }, 1600);
 }
 
+// ---------- per-story feedback ----------
+
+// Four states: unrated -> liked | editing -> saved. Each repaints the block in
+// place, so a story only ever shows one question at a time.
+function renderFeedback(box, story) {
+  const idx = story.index;
+  const state = feedback.get(idx);
+  box.innerHTML = "";
+
+  if (state?.verdict === "like") {
+    box.innerHTML = `
+      <div class="fb-note good">
+        <span>Liked — kept as written.</span>
+        <button type="button" class="ghost" data-act="reset">Change my mind</button>
+      </div>`;
+  } else if (state?.verdict === "dislike" && state.savedAt) {
+    box.innerHTML = `
+      <div class="fb-note good">
+        <span>Your final version is saved.</span>
+        <button type="button" class="ghost" data-act="edit">Edit it</button>
+      </div>`;
+  } else if (state?.verdict === "dislike") {
+    box.innerHTML = `
+      <div class="fb-edit">
+        <label>Your final version</label>
+        <p class="fb-hint">Pre-filled with the rewrite above — edit it into
+          exactly what you published, whether that is a few words or a complete
+          rewrite.</p>
+        <textarea data-role="final"></textarea>
+        <div class="fb-actions">
+          <button type="button" data-act="save">Save this preference</button>
+          <button type="button" class="ghost" data-act="reset">Cancel</button>
+        </div>
+      </div>`;
+    // Set through .value, not markup, so the text needs no escaping.
+    box.querySelector("[data-role='final']").value =
+      state.final || plainText(story);
+  } else {
+    box.innerHTML = `
+      <div class="fb-ask">
+        <span class="fb-q">How is this rewrite?</span>
+        <button type="button" class="ghost" data-act="like">I like it</button>
+        <button type="button" class="ghost" data-act="dislike">I don't like it</button>
+      </div>`;
+  }
+
+  box.querySelectorAll("button[data-act]").forEach((btn) => {
+    btn.addEventListener("click", () => onFeedback(btn.dataset.act, box, story));
+  });
+}
+
+function onFeedback(act, box, story) {
+  const idx = story.index;
+
+  if (act === "like") {
+    feedback.set(idx, { verdict: "like" });
+    savePreference({
+      runId,
+      savedAt: new Date().toISOString(),
+      verdict: "like",
+      storyIndex: idx,
+      source: lastSubmitted[idx - 1]?.text ?? "",
+      rewritten: plainText(story),
+      final: null,
+    });
+  } else if (act === "dislike" || act === "edit") {
+    const prev = feedback.get(idx);
+    feedback.set(idx, { verdict: "dislike", final: prev?.final ?? "" });
+  } else if (act === "reset") {
+    feedback.delete(idx);
+    clearError();
+    dropPreference(idx);
+  } else if (act === "save") {
+    const final = box.querySelector("[data-role='final']").value.trim();
+    if (!final) {
+      showError("Paste your final version before saving.");
+      return;
+    }
+    if (final === plainText(story)) {
+      showError(
+        "That is identical to the rewrite — edit it, or choose 'I like it'.",
+      );
+      return;
+    }
+    clearError();
+    if (
+      !savePreference({
+        runId,
+        savedAt: new Date().toISOString(),
+        verdict: "dislike",
+        storyIndex: idx,
+        source: lastSubmitted[idx - 1]?.text ?? "",
+        rewritten: plainText(story),
+        final,
+      })
+    ) {
+      return;
+    }
+    feedback.set(idx, { verdict: "dislike", final, savedAt: Date.now() });
+  }
+
+  renderFeedback(box, story);
+}
+
 function render(stories) {
   resultsEl.innerHTML = "";
   stories.forEach((s) => {
@@ -130,10 +333,12 @@ function render(stories) {
       <p>${escapeHtml(s.paragraph2 || "")}</p>
       <footer>
         <button type="button" class="ghost">Copy this story</button>
-      </footer>`;
+      </footer>
+      <div class="feedback"></div>`;
     card.querySelector("footer button").addEventListener("click", (e) => {
       copy(plainText(s), e.currentTarget);
     });
+    renderFeedback(card.querySelector(".feedback"), s);
     resultsEl.appendChild(card);
   });
   resultsHead.hidden = stories.length === 0;
@@ -193,6 +398,9 @@ async function run() {
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status}).`);
 
     lastResults = data.stories || [];
+    lastSubmitted = stories;
+    runId = new Date().toISOString();
+    feedback.clear();
     render(lastResults);
 
     // Successful rewrite: clear the input boxes and the saved draft so the
@@ -225,6 +433,8 @@ $("clear").addEventListener("click", () => {
   for (const el of fields()) el.value = "";
   saveDraft();
   lastResults = [];
+  lastSubmitted = [];
+  feedback.clear();
   resultsEl.innerHTML = "";
   resultsHead.hidden = true;
   statusEl.textContent = "";
