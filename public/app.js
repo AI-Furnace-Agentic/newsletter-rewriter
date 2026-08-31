@@ -99,6 +99,33 @@ function loadPreferences() {
   }
 }
 
+// Mirror every verdict to the server: the weekly learning job reads KV, not
+// this browser. localStorage stays as the local cache behind the footer UI.
+// Fire-and-forget with a visible error — a failed sync must not block the UI.
+function syncFeedback(action, entry) {
+  fetch("/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      passphrase: passInput.value.trim(),
+      action,
+      runId: entry.runId,
+      storyIndex: entry.storyIndex,
+      verdict: entry.verdict,
+      source: entry.source,
+      rewritten: entry.rewritten,
+      final: entry.final,
+    }),
+  })
+    .then((r) => r.json())
+    .then((d) => {
+      if (d.error) showError(`Saved locally, but not to the server: ${d.error}`);
+    })
+    .catch(() => {
+      showError("Saved locally, but the server could not be reached.");
+    });
+}
+
 // One record per (run, story): re-voting replaces the earlier verdict rather
 // than stacking a second, conflicting one on top of it.
 function savePreference(entry) {
@@ -115,6 +142,7 @@ function savePreference(entry) {
     return false;
   }
   refreshLog();
+  syncFeedback("save", entry);
   return true;
 }
 
@@ -143,6 +171,7 @@ function dropPreference(storyIndex) {
     /* ignore */
   }
   refreshLog();
+  syncFeedback("delete", { runId, storyIndex });
 }
 
 $("fb-export").addEventListener("click", () => {

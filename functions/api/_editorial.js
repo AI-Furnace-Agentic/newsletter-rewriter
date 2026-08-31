@@ -1,3 +1,4 @@
+import { LEARNED_RULES } from "./_learned.js";
 // The AI Furnace rewriting rules.
 //
 // Derived primarily from 9 gold raw->expected pairs Albert supplied on
@@ -242,11 +243,31 @@ let cachedRemoteSpec = null;
 let cachedAt = 0;
 const CACHE_MS = 60_000;
 
+// The served spec = frozen human base + machine-learned weekly rules. The
+// learned block explicitly ranks below the base: where they disagree, the
+// gold examples win.
+function withLearned(base) {
+  const rules = (LEARNED_RULES || "").trim();
+  if (!rules || rules.startsWith("(No learned rules")) return base;
+  return (
+    base +
+    "
+
+## LEARNED PREFERENCES (from the editor's published versions)
+" +
+    "Apply these on top of everything above. If any of them conflicts with " +
+    "the gold examples or hard constraints, the examples and constraints win.
+
+" +
+    rules
+  );
+}
+
 export async function loadSpec(env) {
-  if (!env.SPEC_URL) return EDITORIAL_SPEC;
+  if (!env.SPEC_URL) return withLearned(EDITORIAL_SPEC);
 
   const fresh = cachedRemoteSpec && Date.now() - cachedAt < CACHE_MS;
-  if (fresh) return cachedRemoteSpec;
+  if (fresh) return withLearned(cachedRemoteSpec);
 
   try {
     const res = await fetch(env.SPEC_URL, { cf: { cacheTtl: 60 } });
@@ -255,9 +276,9 @@ export async function loadSpec(env) {
     if (!text) throw new Error("empty spec");
     cachedRemoteSpec = text;
     cachedAt = Date.now();
-    return text;
+    return withLearned(text);
   } catch {
     // A broken or unreachable SPEC_URL must not take the tool down.
-    return cachedRemoteSpec || EDITORIAL_SPEC;
+    return withLearned(cachedRemoteSpec || EDITORIAL_SPEC);
   }
 }

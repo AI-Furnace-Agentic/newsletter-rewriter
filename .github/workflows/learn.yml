@@ -1,0 +1,54 @@
+name: Weekly rubric learning
+
+on:
+  schedule:
+    # Tuesday 21:00 Asia/Bangkok = Tuesday 14:00 UTC — after the newsletter
+    # is published, so the editor's finals are final.
+    - cron: "0 14 * * 2"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Learn from the week's feedback
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_TOKEN: ${{ secrets.CF_KV_TOKEN }}
+          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/learn.py
+
+      - name: Sanity-check the generated file
+        run: node --check functions/api/_learned.js
+
+      - name: Commit the updated rules (deploys via Cloudflare)
+        run: |
+          git config user.name "rubric-learner"
+          git config user.email "actions@github.com"
+          if git diff --quiet functions/api/_learned.js; then
+            echo "Rules unchanged; nothing to commit."
+          else
+            git add functions/api/_learned.js
+            git commit -m "Weekly rubric update from editor feedback"
+            git push
+          fi
+
+      - name: Mark feedback processed
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_TOKEN: ${{ secrets.CF_KV_TOKEN }}
+          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+        run: python scripts/learn.py --mark-done
