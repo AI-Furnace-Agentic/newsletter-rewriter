@@ -2,9 +2,9 @@ name: Weekly rubric learning
 
 on:
   schedule:
-    # Tuesday 21:00 Asia/Bangkok = Tuesday 14:00 UTC — after the newsletter
-    # is published, so the editor's finals are final.
-    - cron: "0 14 * * 2"
+    # Tuesday 9:00 PM ET, after the newsletter is published. Cron is UTC:
+    # Wed 01:00 UTC = Tue 9 PM EDT (8 PM EST after the November DST change).
+    - cron: "0 1 * * 3"
   workflow_dispatch: {}
 
 permissions:
