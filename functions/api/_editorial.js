@@ -251,14 +251,9 @@ function withLearned(base) {
   if (!rules || rules.startsWith("(No learned rules")) return base;
   return (
     base +
-    "
-
-## LEARNED PREFERENCES (from the editor's published versions)
-" +
+    "\n\n## LEARNED PREFERENCES (from the editor's published versions)\n" +
     "Apply these on top of everything above. If any of them conflicts with " +
-    "the gold examples or hard constraints, the examples and constraints win.
-
-" +
+    "the gold examples or hard constraints, the examples and constraints win.\n\n" +
     rules
   );
 }
