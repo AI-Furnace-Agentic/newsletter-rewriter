@@ -34,8 +34,8 @@ export default {
   // once; only GitHub's own scheduler queues for hours.
   async scheduled(event, env, ctx) {
     const jobs = {
-      "0 14 * * 1": ["digest-pipeline", "digest.yml"],
-      "0 1 * * 3": ["newsletter-rewriter", "learn.yml"],
+      "0 14 * * MON": ["digest-pipeline", "digest.yml"],
+      "0 1 * * WED": ["newsletter-rewriter", "learn.yml"],
     };
     const job = jobs[event.cron];
     if (!job || !env.GITHUB_DISPATCH_TOKEN) return;
