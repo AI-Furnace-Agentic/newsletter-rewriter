@@ -28,4 +28,32 @@ export default {
 
     return env.ASSETS.fetch(request);
   },
+
+  // Cloudflare fires this at the times in wrangler.jsonc "triggers". We tell
+  // GitHub to start the matching workflow immediately - its API obeys at
+  // once; only GitHub's own scheduler queues for hours.
+  async scheduled(event, env, ctx) {
+    const jobs = {
+      "0 14 * * 1": ["digest-pipeline", "digest.yml"],
+      "0 1 * * 3": ["newsletter-rewriter", "learn.yml"],
+    };
+    const job = jobs[event.cron];
+    if (!job || !env.GITHUB_DISPATCH_TOKEN) return;
+    const [repo, workflow] = job;
+    ctx.waitUntil(
+      fetch(
+        `https://api.github.com/repos/AI-Furnace-Agentic/${repo}/actions/workflows/${workflow}/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "aifurnace-cron",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ref: "main" }),
+        },
+      ),
+    );
+  },
 };

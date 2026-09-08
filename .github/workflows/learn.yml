@@ -1,10 +1,9 @@
 name: Weekly rubric learning
 
+# Started every Tuesday 9 PM ET by the Cloudflare Worker's cron (see
+# wrangler.jsonc "triggers") - GitHub's own scheduler ran hours late, so it
+# no longer holds the clock. Manual runs: the Run workflow button.
 on:
-  schedule:
-    # Tuesday 9:00 PM ET, after the newsletter is published. Cron is UTC:
-    # Wed 01:00 UTC = Tue 9 PM EDT (8 PM EST after the November DST change).
-    - cron: "0 1 * * 3"
   workflow_dispatch: {}
 
 permissions:

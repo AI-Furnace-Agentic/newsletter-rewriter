@@ -7,6 +7,10 @@
   // Deploys must not wipe ANTHROPIC_API_KEY / APP_PASSPHRASE set in the
   // Cloudflare dashboard. Without this, every deploy clears them.
   "keep_vars": true,
+  // Punctual clocks (UTC). GitHub's own scheduler ran 4-6h late, so this
+  // Worker dispatches the jobs instead: Mon 14:00 = digest (10am ET),
+  // Wed 01:00 = rubric learning (Tue 9pm ET).
+  "triggers": { "crons": ["0 14 * * 1", "0 1 * * 3"] },
   // Feedback records pending the Tuesday learning job.
   "kv_namespaces": [
     { "binding": "FEEDBACK", "id": "e24df9d0421d4f328d1406adfd6d4df6" }
